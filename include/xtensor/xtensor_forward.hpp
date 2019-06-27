@@ -31,6 +31,7 @@
 
 namespace xt
 {
+    struct xts_expression_tag;
     struct xtensor_expression_tag;
     struct xoptional_expression_tag;
 
@@ -134,6 +135,15 @@ namespace xt
               class A = XTENSOR_DEFAULT_ALLOCATOR(T)>
     using xtensor = xtensor_container<XTENSOR_DEFAULT_DATA_CONTAINER(T, A), N, L>;
 
+    template <class EC, std::size_t N, layout_type L = XTENSOR_DEFAULT_LAYOUT, class Tag = xts_expression_tag>
+    class xts_container;
+
+    template <class T,
+              std::size_t N = 2,
+              layout_type L = XTENSOR_DEFAULT_LAYOUT,
+              class A = XTENSOR_DEFAULT_ALLOCATOR(T)>
+    using xts = xts_container<XTENSOR_DEFAULT_DATA_CONTAINER(T, A), N, L>;
+
     template <class EC, std::size_t N, layout_type L = XTENSOR_DEFAULT_LAYOUT, class Tag = xtensor_expression_tag>
     class xtensor_adaptor;
 
@@ -142,6 +152,12 @@ namespace xt
 
     template <std::size_t... N>
     class fixed_shape;
+
+    template <class EC, std::size_t N, layout_type L = XTENSOR_DEFAULT_LAYOUT, class Tag = xts_expression_tag>
+    class xts_adaptor;
+
+    template <class EC, std::size_t N, layout_type L = XTENSOR_DEFAULT_LAYOUT, class Tag = xts_expression_tag>
+    class xts_view;
 
     /**
      * @typedef xshape

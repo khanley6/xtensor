@@ -44,6 +44,12 @@ namespace xt
         };
 
         template <class CT, class S, layout_type L, class FST>
+        struct xstrided_view_base_impl<xts_expression_tag, CT, S, L, FST>
+        {
+            using type = xts_empty_base;
+        };
+
+        template <class CT, class S, layout_type L, class FST>
         struct xstrided_view_base
             : xstrided_view_base_impl<xexpression_tag_t<CT>, CT, S, L, FST>
         {

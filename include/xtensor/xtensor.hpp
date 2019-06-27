@@ -39,6 +39,19 @@ namespace xt
 
         template <class EC, std::size_t N, layout_type L, class Tag>
         using xtensor_container_base_t = typename xtensor_container_base<EC, N, L, Tag>::type;
+
+
+        template <class EC, std::size_t N, layout_type L, class Tag>
+        struct xts_container_base;
+
+        template <class EC, std::size_t N, layout_type L>
+        struct xts_container_base<EC, N, L, xts_expression_tag>
+        {
+            using type = xts_empty_base;
+        };
+
+        template <class EC, std::size_t N, layout_type L, class Tag>
+        using xts_container_base_t = typename xts_container_base<EC, N, L, Tag>::type;
     }
 
     template <class EC, std::size_t N, layout_type L, class Tag>
@@ -900,6 +913,743 @@ namespace xt
         }
         return out;
     }
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    struct xcontainer_inner_types<xts_container<EC, N, L, Tag>>
+    {
+        using storage_type = EC;
+        using reference = inner_reference_t<storage_type>;
+        using const_reference = typename storage_type::const_reference;
+        using size_type = typename storage_type::size_type;
+        using shape_type = std::array<typename storage_type::size_type, N>;
+        using strides_type = get_strides_t<shape_type>;
+        using backstrides_type = get_strides_t<shape_type>;
+        using inner_shape_type = shape_type;
+        using inner_strides_type = strides_type;
+        using inner_backstrides_type = backstrides_type;
+        using temporary_type = xts_container<EC, N, L, Tag>;
+        static constexpr layout_type layout = L;
+    };
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    struct xiterable_inner_types<xts_container<EC, N, L, Tag>>
+        : xcontainer_iterable_types<xts_container<EC, N, L, Tag>>
+    {
+    };
+
+    /**
+     * @class xts_container
+     * @brief Dense multidimensional container with tensor semantic and fixed
+     * dimension.
+     *
+     * The xtensor_container class implements a dense multidimensional container
+     * with tensor semantics and fixed dimension
+     *
+     * @tparam EC The type of the container holding the elements.
+     * @tparam N The dimension of the container.
+     * @tparam L The layout_type of the tensor.
+     * @tparam Tag The expression tag.
+     * @sa xtensor, xstrided_container, xcontainer
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    class xts_container : public xts_strided_container<xts_container<EC, N, L, Tag>>,
+                          public xcontainer_semantic<xts_container<EC, N, L, Tag>>,
+                          public extension::xts_container_base_t<EC, N, L, Tag>
+    {
+    public:
+
+        using self_type = xts_container<EC, N, L, Tag>;
+        using base_type = xts_strided_container<self_type>;
+        using semantic_base = xcontainer_semantic<self_type>;
+        using extension_base = extension::xts_container_base_t<EC, N, L, Tag>;
+        using storage_type = typename base_type::storage_type;
+        using allocator_type = typename base_type::allocator_type;
+        using value_type = typename base_type::value_type;
+        using reference = typename base_type::reference;
+        using const_reference = typename base_type::const_reference;
+        using pointer = typename base_type::pointer;
+        using const_pointer = typename base_type::const_pointer;
+        using shape_type = typename base_type::shape_type;
+        using inner_shape_type = typename base_type::inner_shape_type;
+        using strides_type = typename base_type::strides_type;
+        using backstrides_type = typename base_type::backstrides_type;
+        using inner_backstrides_type = typename base_type::inner_backstrides_type;
+        using inner_strides_type = typename base_type::inner_strides_type;
+        using temporary_type = typename semantic_base::temporary_type;
+        using expression_tag = Tag;
+
+        xts_container();
+        xts_container(nested_initializer_list_t<value_type, N> t);
+        explicit xts_container(const shape_type& shape, layout_type l = L);
+        explicit xts_container(const shape_type& shape, const_reference value, layout_type l = L);
+        explicit xts_container(const shape_type& shape, const strides_type& strides);
+        explicit xts_container(const shape_type& shape, const strides_type& strides, const_reference value);
+        explicit xts_container(storage_type&& storage, inner_shape_type&& shape, inner_strides_type&& strides);
+
+        template <class S = shape_type>
+        static xts_container from_shape(S&& s);
+
+        ~xts_container() = default;
+
+        xts_container(const xts_container&) = default;
+        xts_container& operator=(const xts_container&) = default;
+
+        xts_container(xts_container&&) = default;
+        xts_container& operator=(xts_container&&) = default;
+
+        template <class SC>
+        explicit xts_container(xarray_container<EC, L, SC, Tag>&&);
+        template <class SC>
+        xts_container& operator=(xarray_container<EC, L, SC, Tag>&&);
+
+        template <class E>
+        xts_container(const xexpression<E>& e);
+
+        template <class E>
+        xts_container& operator=(const xexpression<E>& e);
+
+    private:
+
+        storage_type m_storage;
+
+        storage_type& storage_impl() noexcept;
+        const storage_type& storage_impl() const noexcept;
+
+        friend class xcontainer<xts_container<EC, N, L, Tag>>;
+    };
+
+    /*****************************************
+     * xts_container_adaptor declaration *
+     *****************************************/
+
+    namespace extension
+    {
+        template <class EC, std::size_t N, layout_type L, class Tag>
+        struct xts_adaptor_base;
+
+        template <class EC, std::size_t N, layout_type L>
+        struct xts_adaptor_base<EC, N, L, xts_expression_tag>
+        {
+            using type = xts_empty_base;
+        };
+
+        template <class EC, std::size_t N, layout_type L, class Tag>
+        using xts_adaptor_base_t = typename xts_adaptor_base<EC, N, L, Tag>::type;
+    }
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    struct xcontainer_inner_types<xts_adaptor<EC, N, L, Tag>>
+    {
+        using storage_type = std::remove_reference_t<EC>;
+        using reference = inner_reference_t<storage_type>;
+        using const_reference = typename storage_type::const_reference;
+        using size_type = typename storage_type::size_type;
+        using shape_type = std::array<typename storage_type::size_type, N>;
+        using strides_type = get_strides_t<shape_type>;
+        using backstrides_type = get_strides_t<shape_type>;
+        using inner_shape_type = shape_type;
+        using inner_strides_type = strides_type;
+        using inner_backstrides_type = backstrides_type;
+        using temporary_type = xts_container<temporary_container_t<storage_type>, N, L, Tag>;
+        static constexpr layout_type layout = L;
+    };
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    struct xiterable_inner_types<xts_adaptor<EC, N, L, Tag>>
+        : xcontainer_iterable_types<xts_adaptor<EC, N, L, Tag>>
+    {
+    };
+
+    /**
+     * @class xts_adaptor
+     * @brief Dense multidimensional container adaptor with tensor
+     * semantics and fixed dimension.
+     *
+     * The xts_adaptor class implements a dense multidimensional
+     * container adaptor with tensor semantics and fixed dimension. It
+     * is used to provide a multidimensional container semantic and a
+     * tensor semantic to stl-like containers.
+     *
+     * @tparam EC The closure for the container type to adapt.
+     * @tparam N The dimension of the adaptor.
+     * @tparam L The layout_type of the adaptor.
+     * @tparam Tag The expression tag.
+     * @sa xstrided_container, xcontainer
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    class xts_adaptor : public xts_strided_container<xts_adaptor<EC, N, L, Tag>>,
+                        public xcontainer_semantic<xts_adaptor<EC, N, L, Tag>>,
+                        public extension::xts_adaptor_base_t<EC, N, L, Tag>
+    {
+    public:
+
+        using container_closure_type = EC;
+
+        using self_type = xts_adaptor<EC, N, L, Tag>;
+        using base_type = xstrided_container<self_type>;
+        using semantic_base = xcontainer_semantic<self_type>;
+        using extension_base = extension::xts_adaptor_base_t<EC, N, L, Tag>;
+        using storage_type = typename base_type::storage_type;
+        using allocator_type = typename base_type::allocator_type;
+        using shape_type = typename base_type::shape_type;
+        using strides_type = typename base_type::strides_type;
+        using backstrides_type = typename base_type::backstrides_type;
+        using temporary_type = typename semantic_base::temporary_type;
+        using expression_tag = Tag;
+
+        xts_adaptor(storage_type&& storage);
+        xts_adaptor(const storage_type& storage);
+
+        template <class D>
+        xts_adaptor(D&& storage, const shape_type& shape, layout_type l = L);
+
+        template <class D>
+        xts_adaptor(D&& storage, const shape_type& shape, const strides_type& strides);
+
+        ~xts_adaptor() = default;
+
+        xts_adaptor(const xts_adaptor&) = default;
+        xts_adaptor& operator=(const xts_adaptor&);
+
+        xts_adaptor(xts_adaptor&&) = default;
+        xts_adaptor& operator=(xts_adaptor&&);
+        xts_adaptor& operator=(temporary_type&&);
+
+        template <class E>
+        xts_adaptor& operator=(const xexpression<E>& e);
+
+    private:
+
+        container_closure_type m_storage;
+
+        storage_type& storage_impl() noexcept;
+        const storage_type& storage_impl() const noexcept;
+
+        friend class xcontainer<xts_adaptor<EC, N, L, Tag>>;
+    };
+
+    /****************************
+     * xts_view declaration *
+     ****************************/
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    class xts_view;
+
+    namespace extension
+    {
+        template <class EC, std::size_t N, layout_type L, class Tag>
+        struct xts_view_base;
+
+        template <class EC, std::size_t N, layout_type L>
+        struct xts_view_base<EC, N, L, xts_expression_tag>
+        {
+            using type = xts_empty_base;
+        };
+
+        template <class EC, std::size_t N, layout_type L, class Tag>
+        using xts_view_base_t = typename xts_view_base<EC, N, L, Tag>::type;
+    }
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    struct xcontainer_inner_types<xts_view<EC, N, L, Tag>>
+    {
+        using storage_type = std::remove_reference_t<EC>;
+        using reference = inner_reference_t<storage_type>;
+        using const_reference = typename storage_type::const_reference;
+        using size_type = typename storage_type::size_type;
+        using shape_type = std::array<typename storage_type::size_type, N>;
+        using strides_type = get_strides_t<shape_type>;
+        using backstrides_type = get_strides_t<shape_type>;
+        using inner_shape_type = shape_type;
+        using inner_strides_type = strides_type;
+        using inner_backstrides_type = backstrides_type;
+        using temporary_type = xts_container<temporary_container_t<storage_type>, N, L, Tag>;
+        static constexpr layout_type layout = L;
+    };
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    struct xiterable_inner_types<xts_view<EC, N, L, Tag>>
+        : xcontainer_iterable_types<xts_view<EC, N, L, Tag>>
+    {
+    };
+
+    /**
+     * @class xts_view
+     * @brief Dense multidimensional container adaptor with view
+     * semantics and fixed dimension.
+     *
+     * The xts_view class implements a dense multidimensional
+     * container adaptor with viewsemantics and fixed dimension. It
+     * is used to provide a multidimensional container semantic and a
+     * view semantic to stl-like containers.
+     *
+     * @tparam EC The closure for the container type to adapt.
+     * @tparam N The dimension of the view.
+     * @tparam L The layout_type of the view.
+     * @tparam Tag The expression tag.
+     * @sa xstrided_container, xcontainer
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    class xts_view : public xts_strided_container<xts_view<EC, N, L, Tag>>,
+                     public xview_semantic<xts_view<EC, N, L, Tag>>,
+                     public extension::xts_view_base_t<EC, N, L, Tag>
+    {
+    public:
+
+        using container_closure_type = EC;
+
+        using self_type = xts_view<EC, N, L, Tag>;
+        using base_type = xstrided_container<self_type>;
+        using semantic_base = xview_semantic<self_type>;
+        using extension_base = extension::xts_adaptor_base_t<EC, N, L, Tag>;
+        using storage_type = typename base_type::storage_type;
+        using allocator_type = typename base_type::allocator_type;
+        using shape_type = typename base_type::shape_type;
+        using strides_type = typename base_type::strides_type;
+        using backstrides_type = typename base_type::backstrides_type;
+        using temporary_type = typename semantic_base::temporary_type;
+        using expression_tag = Tag;
+
+        xts_view(storage_type&& storage);
+        xts_view(const storage_type& storage);
+
+        template <class D>
+        xts_view(D&& storage, const shape_type& shape, layout_type l = L);
+
+        template <class D>
+        xts_view(D&& storage, const shape_type& shape, const strides_type& strides);
+
+        ~xts_view() = default;
+
+        xts_view(const xts_view&) = default;
+        xts_view& operator=(const xts_view&);
+
+        xts_view(xts_view&&) = default;
+        xts_view& operator=(xts_view&&);
+
+        template <class E>
+        self_type& operator=(const xexpression<E>& e);
+
+        template <class E>
+        disable_xexpression<E, self_type>& operator=(const E& e);
+
+    private:
+
+        container_closure_type m_storage;
+
+        storage_type& storage_impl() noexcept;
+        const storage_type& storage_impl() const noexcept;
+
+        void assign_temporary_impl(temporary_type&& tmp);
+
+        friend class xcontainer<xts_view<EC, N, L, Tag>>;
+        friend class xview_semantic<xts_view<EC, N, L, Tag>>;
+    };
+
+    /************************************
+     * xts_container implementation *
+     ************************************/
+
+    /**
+     * @name Constructors
+     */
+    //@{
+    /**
+     * Allocates an uninitialized xts_container that holds 0 elements.
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline xts_container<EC, N, L, Tag>::xts_container()
+        : base_type(), m_storage(N == 0 ? 1 : 0, value_type())
+    {
+    }
+
+    /**
+     * Allocates an xts_container with nested initializer lists.
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline xts_container<EC, N, L, Tag>::xts_container(nested_initializer_list_t<value_type, N> t)
+        : base_type()
+    {
+        base_type::resize(xt::shape<shape_type>(t), true);
+        L == layout_type::row_major ? nested_copy(m_storage.begin(), t) : nested_copy(this->template begin<layout_type::row_major>(), t);
+    }
+
+    /**
+     * Allocates an uninitialized xts_container with the specified shape and
+     * layout_type.
+     * @param shape the shape of the xts_container
+     * @param l the layout_type of the xts_container
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline xts_container<EC, N, L, Tag>::xts_container(const shape_type& shape, layout_type l)
+        : base_type()
+    {
+        base_type::resize(shape, l);
+    }
+
+    /**
+     * Allocates an xts_container with the specified shape and layout_type. Elements
+     * are initialized to the specified value.
+     * @param shape the shape of the xts_container
+     * @param value the value of the elements
+     * @param l the layout_type of the xts_container
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline xts_container<EC, N, L, Tag>::xts_container(const shape_type& shape, const_reference value, layout_type l)
+        : base_type()
+    {
+        base_type::resize(shape, l);
+        std::fill(m_storage.begin(), m_storage.end(), value);
+    }
+
+    /**
+     * Allocates an uninitialized xts_container with the specified shape and strides.
+     * @param shape the shape of the xts_container
+     * @param strides the strides of the xts_container
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline xts_container<EC, N, L, Tag>::xts_container(const shape_type& shape, const strides_type& strides)
+        : base_type()
+    {
+        base_type::resize(shape, strides);
+    }
+
+    /**
+     * Allocates an uninitialized xts_container with the specified shape and strides.
+     * Elements are initialized to the specified value.
+     * @param shape the shape of the xts_container
+     * @param strides the strides of the xts_container
+     * @param value the value of the elements
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline xts_container<EC, N, L, Tag>::xts_container(const shape_type& shape, const strides_type& strides, const_reference value)
+        : base_type()
+    {
+        base_type::resize(shape, strides);
+        std::fill(m_storage.begin(), m_storage.end(), value);
+    }
+
+    /**
+     * Allocates an xts_container by moving specified data, shape and strides
+     *
+     * @param storage the data for the xts_container
+     * @param shape the shape of the xts_container
+     * @param strides the strides of the xts_container
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline xts_container<EC, N, L, Tag>::xts_container(storage_type&& storage, inner_shape_type&& shape, inner_strides_type&& strides)
+        : base_type(std::move(shape), std::move(strides)), m_storage(std::move(storage))
+    {
+    }
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    template <class SC>
+    inline xts_container<EC, N, L, Tag>::xts_container(xarray_container<EC, L, SC, Tag>&& rhs)
+        : base_type(xtl::forward_sequence<inner_shape_type, decltype(rhs.shape())>(rhs.shape()),
+                    xtl::forward_sequence<inner_strides_type, decltype(rhs.strides())>(rhs.strides()),
+                    xtl::forward_sequence<inner_backstrides_type, decltype(rhs.backstrides())>(rhs.backstrides()),
+                    std::move(rhs.layout())),
+          m_storage(std::move(rhs.storage()))
+    {
+    }
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    template <class SC>
+    inline xts_container<EC, N, L, Tag>& xts_container<EC, N, L, Tag>::operator=(xarray_container<EC, L, SC, Tag>&& rhs)
+    {
+        XTENSOR_ASSERT_MSG(N == rhs.dimension(), "Cannot change dimension of xts.");
+        std::copy(rhs.shape().begin(), rhs.shape().end(), this->shape_impl().begin());
+        std::copy(rhs.strides().cbegin(), rhs.strides().cend(), this->strides_impl().begin());
+        std::copy(rhs.backstrides().cbegin(), rhs.backstrides().cend(), this->backstrides_impl().begin());
+        this->mutable_layout() = std::move(rhs.layout());
+        m_storage = std::move(std::move(rhs.storage()));
+        return *this;
+    }
+
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    template <class S>
+    inline xts_container<EC, N, L, Tag> xts_container<EC, N, L, Tag>::from_shape(S&& s)
+    {
+        XTENSOR_ASSERT_MSG(s.size() == N, "Cannot change dimension of xts.");
+        shape_type shape = xtl::forward_sequence<shape_type, S>(s);
+        return self_type(shape);
+    }
+    //@}
+
+    /**
+     * @name Extended copy semantic
+     */
+    //@{
+    /**
+     * The extended copy constructor.
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    template <class E>
+    inline xts_container<EC, N, L, Tag>::xts_container(const xexpression<E>& e)
+        : base_type()
+    {
+        XTENSOR_ASSERT_MSG(N == e.derived_cast().dimension(), "Cannot change dimension of xts.");
+        // Avoids uninitialized data because of (m_shape == shape) condition
+        // in resize (called by assign), which is always true when dimension() == 0.
+        if (e.derived_cast().dimension() == 0)
+        {
+            detail::resize_data_container(m_storage, std::size_t(1));
+        }
+        semantic_base::assign(e);
+    }
+
+    /**
+     * The extended assignment operator.
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    template <class E>
+    inline auto xts_container<EC, N, L, Tag>::operator=(const xexpression<E>& e) -> self_type&
+    {
+        return semantic_base::operator=(e);
+    }
+    //@}
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline auto xts_container<EC, N, L, Tag>::storage_impl() noexcept -> storage_type&
+    {
+        return m_storage;
+    }
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline auto xts_container<EC, N, L, Tag>::storage_impl() const noexcept -> const storage_type&
+    {
+        return m_storage;
+    }
+
+    /**********************************
+     * xts_adaptor implementation *
+     **********************************/
+
+    /**
+     * @name Constructors
+     */
+    //@{
+    /**
+     * Constructs an xts_adaptor of the given stl-like container.
+     * @param storage the container to adapt
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline xts_adaptor<EC, N, L, Tag>::xts_adaptor(storage_type&& storage)
+        : base_type(), m_storage(std::move(storage))
+    {
+    }
+
+    /**
+     * Constructs an xts_adaptor of the given stl-like container.
+     * @param storage the container to adapt
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline xts_adaptor<EC, N, L, Tag>::xts_adaptor(const storage_type& storage)
+        : base_type(), m_storage(storage)
+    {
+    }
+
+    /**
+     * Constructs an xts_adaptor of the given stl-like container,
+     * with the specified shape and layout_type.
+     * @param storage the container to adapt
+     * @param shape the shape of the xts_adaptor
+     * @param l the layout_type of the xts_adaptor
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    template <class D>
+    inline xts_adaptor<EC, N, L, Tag>::xts_adaptor(D&& storage, const shape_type& shape, layout_type l)
+        : base_type(), m_storage(std::forward<D>(storage))
+    {
+        base_type::resize(shape, l);
+    }
+
+    /**
+     * Constructs an xts_adaptor of the given stl-like container,
+     * with the specified shape and strides.
+     * @param storage the container to adapt
+     * @param shape the shape of the xts_adaptor
+     * @param strides the strides of the xts_adaptor
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    template <class D>
+    inline xts_adaptor<EC, N, L, Tag>::xts_adaptor(D&& storage, const shape_type& shape, const strides_type& strides)
+        : base_type(), m_storage(std::forward<D>(storage))
+    {
+        base_type::resize(shape, strides);
+    }
+    //@}
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline auto xts_adaptor<EC, N, L, Tag>::operator=(const xts_adaptor& rhs) -> self_type&
+    {
+        base_type::operator=(rhs);
+        m_storage = rhs.m_storage;
+        return *this;
+    }
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline auto xts_adaptor<EC, N, L, Tag>::operator=(xts_adaptor&& rhs) -> self_type&
+    {
+        base_type::operator=(std::move(rhs));
+        m_storage = rhs.m_storage;
+        return *this;
+    }
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline auto xts_adaptor<EC, N, L, Tag>::operator=(temporary_type&& rhs) -> self_type&
+    {
+        base_type::shape_impl() = std::move(const_cast<shape_type&>(rhs.shape()));
+        base_type::strides_impl() = std::move(const_cast<strides_type&>(rhs.strides()));
+        base_type::backstrides_impl() = std::move(const_cast<backstrides_type&>(rhs.backstrides()));
+        m_storage = std::move(rhs.storage());
+        return *this;
+    }
+
+    /**
+     * @name Extended copy semantic
+     */
+    //@{
+    /**
+     * The extended assignment operator.
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    template <class E>
+    inline auto xts_adaptor<EC, N, L, Tag>::operator=(const xexpression<E>& e) -> self_type&
+    {
+        return semantic_base::operator=(e);
+    }
+    //@}
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline auto xts_adaptor<EC, N, L, Tag>::storage_impl() noexcept -> storage_type&
+    {
+        return m_storage;
+    }
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline auto xts_adaptor<EC, N, L, Tag>::storage_impl() const noexcept -> const storage_type&
+    {
+        return m_storage;
+    }
+
+    /*******************************
+     * xts_view implementation *
+     *******************************/
+
+    /**
+     * @name Constructors
+     */
+    //@{
+    /**
+     * Constructs an xts_view of the given stl-like container.
+     * @param storage the container to adapt
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline xts_view<EC, N, L, Tag>::xts_view(storage_type&& storage)
+        : base_type(), m_storage(std::move(storage))
+    {
+    }
+
+    /**
+     * Constructs an xts_view of the given stl-like container.
+     * @param storage the container to adapt
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline xts_view<EC, N, L, Tag>::xts_view(const storage_type& storage)
+        : base_type(), m_storage(storage)
+    {
+    }
+
+    /**
+     * Constructs an xts_view of the given stl-like container,
+     * with the specified shape and layout_type.
+     * @param storage the container to adapt
+     * @param shape the shape of the xts_view
+     * @param l the layout_type of the xts_view
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    template <class D>
+    inline xts_view<EC, N, L, Tag>::xts_view(D&& storage, const shape_type& shape, layout_type l)
+        : base_type(), m_storage(std::forward<D>(storage))
+    {
+        base_type::resize(shape, l);
+    }
+
+    /**
+     * Constructs an xts_view of the given stl-like container,
+     * with the specified shape and strides.
+     * @param storage the container to adapt
+     * @param shape the shape of the xts_view
+     * @param strides the strides of the xts_view
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    template <class D>
+    inline xts_view<EC, N, L, Tag>::xts_view(D&& storage, const shape_type& shape, const strides_type& strides)
+        : base_type(), m_storage(std::forward<D>(storage))
+    {
+        base_type::resize(shape, strides);
+    }
+    //@}
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline auto xts_view<EC, N, L, Tag>::operator=(const xts_view& rhs) -> self_type&
+    {
+        base_type::operator=(rhs);
+        m_storage = rhs.m_storage;
+        return *this;
+    }
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline auto xts_view<EC, N, L, Tag>::operator=(xts_view&& rhs) -> self_type&
+    {
+        base_type::operator=(std::move(rhs));
+        m_storage = rhs.m_storage;
+        return *this;
+    }
+
+    /**
+     * @name Extended copy semantic
+     */
+    //@{
+    /**
+     * The extended assignment operator.
+     */
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    template <class E>
+    inline auto xts_view<EC, N, L, Tag>::operator=(const xexpression<E>& e) -> self_type&
+    {
+        return semantic_base::operator=(e);
+    }
+    //@}
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    template <class E>
+    inline auto xts_view<EC, N, L, Tag>::operator=(const E& e) -> disable_xexpression<E, self_type>&
+    {
+        std::fill(m_storage.begin(), m_storage.end(), e);
+        return *this;
+    }
+    
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline auto xts_view<EC, N, L, Tag>::storage_impl() noexcept -> storage_type&
+    {
+        return m_storage;
+    }
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline auto xts_view<EC, N, L, Tag>::storage_impl() const noexcept -> const storage_type&
+    {
+        return m_storage;
+    }
+
+    template <class EC, std::size_t N, layout_type L, class Tag>
+    inline void xts_view<EC, N, L, Tag>::assign_temporary_impl(temporary_type&& tmp)
+    {
+        std::copy(tmp.cbegin(), tmp.cend(), m_storage.begin());
+    }
+
 }
 
 #endif

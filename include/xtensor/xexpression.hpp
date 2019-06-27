@@ -235,6 +235,10 @@ namespace xt
      * expression tag system *
      *************************/
 
+    struct xts_expression_tag
+    {
+    };
+
     struct xtensor_expression_tag
     {
     };
@@ -316,6 +320,11 @@ namespace xt
         struct xtensor_empty_base
         {
             using expression_tag = xtensor_expression_tag;
+        };
+
+        struct xts_empty_base
+        {
+            using expression_tag = xts_expression_tag;
         };
     }
 
