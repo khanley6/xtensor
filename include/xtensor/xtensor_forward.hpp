@@ -47,6 +47,9 @@ namespace xt
     template <class T, std::size_t N, class A, bool Init>
     class svector;
 
+    template <class T, class A>
+    class kvector;
+
     template <class EC,
               layout_type L = XTENSOR_DEFAULT_LAYOUT,
               class SC = XTENSOR_DEFAULT_SHAPE_CONTAINER(typename EC::value_type,
@@ -138,11 +141,31 @@ namespace xt
     template <class EC, std::size_t N, layout_type L = XTENSOR_DEFAULT_LAYOUT, class Tag = xts_expression_tag>
     class xts_container;
 
+    /**
+     * @typedef xts
+     * Alias template on xts_container with default parameters for data container
+     * type. This allows to write
+     *
+     * \code{.cpp}
+     * xt::xts<double, 2> a = {{1., 2.}, {3., 4.}};
+     * \endcode
+     *
+     * instead of the heavier syntax
+     *
+     * \code{.cpp}
+     * xt::xts_container<std::vector<double>, 2> a = ...
+     * \endcode
+     *
+     * @tparam T The value type of the elements.
+     * @tparam N The dimension of the tensor.
+     * @tparam L The layout_type of the tensor (default: XTENSOR_DEFAULT_LAYOUT).
+     * @tparam A The allocator of the containers holding the elements.
+     */
     template <class T,
               std::size_t N = 2,
               layout_type L = XTENSOR_DEFAULT_LAYOUT,
               class A = XTENSOR_DEFAULT_ALLOCATOR(T)>
-    using xts = xts_container<XTENSOR_DEFAULT_DATA_CONTAINER(T, A), N, L>;
+    using xts = xts_container<kvector<T, A>, N, L>;
 
     template <class EC, std::size_t N, layout_type L = XTENSOR_DEFAULT_LAYOUT, class Tag = xtensor_expression_tag>
     class xtensor_adaptor;

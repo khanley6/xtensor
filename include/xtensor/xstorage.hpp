@@ -1831,6 +1831,549 @@ namespace xt
     {
         return !(lhs == rhs);
     }
+
+
+    template <class T, class Allocator = std::allocator<T>>
+    class kvector
+    {
+    public:
+
+        using allocator_type = Allocator;
+
+        using value_type = typename allocator_type::value_type;
+        using reference = typename allocator_type::reference;
+        using const_reference = typename allocator_type::const_reference;
+        using pointer = typename allocator_type::pointer;
+        using const_pointer = typename allocator_type::const_pointer;
+
+        using size_type = typename allocator_type::size_type;
+        using difference_type = typename allocator_type::difference_type;
+
+        using iterator = pointer;
+        using const_iterator = const_pointer;
+        using reverse_iterator = std::reverse_iterator<iterator>;
+        using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
+        kvector() noexcept;
+        explicit kvector(const allocator_type& alloc) noexcept;
+        explicit kvector(size_type count, const allocator_type& alloc = allocator_type());
+        kvector(size_type count, const_reference value, const allocator_type& alloc = allocator_type());
+
+        template <class InputIt, class = detail::require_input_iter<InputIt>>
+        kvector(InputIt first, InputIt last, const allocator_type& alloc = allocator_type());
+
+        kvector(std::initializer_list<T> init, const allocator_type& alloc = allocator_type());
+
+        ~kvector();
+
+        kvector(const kvector& rhs);
+        kvector(const kvector& rhs, const allocator_type& alloc);
+        kvector& operator=(const kvector&);
+
+        kvector(kvector&& rhs) noexcept;
+        kvector(kvector&& rhs, const allocator_type& alloc) noexcept;
+        kvector& operator=(kvector&& rhs) noexcept;
+
+        allocator_type get_allocator() const noexcept;
+
+        bool empty() const noexcept;
+        size_type size() const noexcept;
+        void resize(size_type size);
+        size_type max_size() const noexcept;
+        void reserve(size_type new_cap);
+        size_type capacity() const noexcept;
+        void shrink_to_fit();
+        void clear();
+
+        reference operator[](size_type i);
+        const_reference operator[](size_type i) const;
+
+        reference at(size_type i);
+        const_reference at(size_type i) const;
+
+        reference front();
+        const_reference front() const;
+
+        reference back();
+        const_reference back() const;
+
+        pointer data() noexcept;
+        const_pointer data() const noexcept;
+
+        iterator begin() noexcept;
+        iterator end() noexcept;
+
+        const_iterator begin() const noexcept;
+        const_iterator end() const noexcept;
+
+        const_iterator cbegin() const noexcept;
+        const_iterator cend() const noexcept;
+
+        reverse_iterator rbegin() noexcept;
+        reverse_iterator rend() noexcept;
+
+        const_reverse_iterator rbegin() const noexcept;
+        const_reverse_iterator rend() const noexcept;
+
+        const_reverse_iterator crbegin() const noexcept;
+        const_reverse_iterator crend() const noexcept;
+
+        void swap(kvector& rhs) noexcept;
+
+    private:
+
+        template <class I>
+        void init_data(I first, I last);
+
+        void resize_impl(size_type new_size);
+        //void resize_impl(size_type new_size, bool keep_data = true, std::optional<T> fill = std::nullopt);
+
+        allocator_type m_allocator;
+
+        // Storing a pair of pointers is more efficient for iterating than
+        // storing a pointer to the beginning and the size of the container
+        pointer p_begin;
+        pointer p_end;
+        std::size_t max_capacity;
+    };
+
+    template <class T, class A>
+    bool operator==(const kvector<T, A>& lhs, const kvector<T, A>& rhs);
+
+    template <class T, class A>
+    bool operator!=(const kvector<T, A>& lhs, const kvector<T, A>& rhs);
+
+    template <class T, class A>
+    bool operator<(const kvector<T, A>& lhs, const kvector<T, A>& rhs);
+
+    template <class T, class A>
+    bool operator<=(const kvector<T, A>& lhs, const kvector<T, A>& rhs);
+
+    template <class T, class A>
+    bool operator>(const kvector<T, A>& lhs, const kvector<T, A>& rhs);
+
+    template <class T, class A>
+    bool operator>=(const kvector<T, A>& lhs, const kvector<T, A>& rhs);
+
+    template <class T, class A>
+    void swap(kvector<T, A>& lhs, kvector<T, A>& rhs) noexcept;
+
+    /**************************
+     * kvector implementation *
+     **************************/
+    template <class T, class A>
+    template <class I>
+    inline void kvector<T, A>::init_data(I first, I last)
+    {
+        size_type size = static_cast<size_type>(std::distance(first, last));
+        if (size != size_type(0))
+        {
+            p_begin = m_allocator.allocate(size);
+            max_capacity = size;
+            std::uninitialized_copy(first, last, p_begin);
+            p_end = p_begin + size;
+        }
+    }
+
+    template <class T, class A>
+    inline void kvector<T, A>::resize_impl(size_type new_size)
+    //inline void kvector<T, A>::resize_impl(size_type new_size, bool keep_data,
+                                           //std::optional<T> fill)
+    {
+        bool retain_data = true;
+        size_type old_size = size();
+        pointer old_begin = p_begin;
+        if (new_size != old_size)
+        {
+            if (new_size < old_size) {
+                // Just change the p_end pointer
+                p_end = p_begin + new_size;
+            } else {
+                // see if the expansion stays within the previously allocated capacity
+                if (new_size <= max_capacity) {
+                    // change the p_end pointer
+                    p_end = p_begin + new_size;
+                } else {
+                    // reallocate buffer and maybe copy the old elements
+                    p_begin = detail::safe_init_allocate(m_allocator, new_size);
+                    p_end = p_begin + new_size;
+                    max_capacity = new_size;
+                    if (retain_data) {
+                        // zero new values or leave garbage?
+                        std::copy(old_begin, old_begin + old_size, p_begin);
+                        std::fill(p_begin + old_size, p_begin + new_size, 0);
+                    }
+                    detail::safe_destroy_deallocate(m_allocator, old_begin, old_size);
+                }
+            }
+        }
+    }
+
+    template <class T, class A>
+    inline kvector<T, A>::kvector() noexcept
+        : kvector(allocator_type())
+    {
+    }
+
+    template <class T, class A>
+    inline kvector<T, A>::kvector(const allocator_type& alloc) noexcept
+        : m_allocator(alloc), p_begin(nullptr), p_end(nullptr), max_capacity(0)
+    {
+    }
+
+    template <class T, class A>
+    inline kvector<T, A>::kvector(size_type count, const allocator_type& alloc)
+        : m_allocator(alloc), p_begin(nullptr), p_end(nullptr), max_capacity(0)
+    {
+        if (count != 0)
+        {
+            p_begin = detail::safe_init_allocate(m_allocator, count);
+            p_end = p_begin + count;
+            max_capacity = count;
+        }
+    }
+
+    template <class T, class A>
+    inline kvector<T, A>::kvector(size_type count, const_reference value, const allocator_type& alloc)
+        : m_allocator(alloc), p_begin(nullptr), p_end(nullptr), max_capacity(0)
+    {
+        if (count != 0)
+        {
+            p_begin = m_allocator.allocate(count);
+            p_end = p_begin + count;
+            std::uninitialized_fill(p_begin, p_end, value);
+            max_capacity = count;
+        }
+    }
+
+    template <class T, class A>
+    template <class InputIt, class>
+    inline kvector<T, A>::kvector(InputIt first, InputIt last, const allocator_type& alloc)
+        : m_allocator(alloc), p_begin(nullptr), p_end(nullptr), max_capacity(0)
+    {
+        init_data(first, last);
+    }
+
+    template <class T, class A>
+    inline kvector<T, A>::kvector(std::initializer_list<T> init, const allocator_type& alloc)
+        : m_allocator(alloc), p_begin(nullptr), p_end(nullptr)
+    {
+        init_data(init.begin(), init.end());
+    }
+
+    template <class T, class A>
+    inline kvector<T, A>::~kvector()
+    {
+        detail::safe_destroy_deallocate(m_allocator, p_begin, size());
+        p_begin = nullptr;
+        p_end = nullptr;
+        max_capacity = 0;
+    }
+
+    template <class T, class A>
+    inline kvector<T, A>::kvector(const kvector& rhs)
+        : m_allocator(std::allocator_traits<allocator_type>::select_on_container_copy_construction(rhs.get_allocator())),
+          p_begin(nullptr), p_end(nullptr)
+    {
+        init_data(rhs.p_begin, rhs.p_end);
+    }
+
+    template <class T, class A>
+    inline kvector<T, A>::kvector(const kvector& rhs, const allocator_type& alloc)
+        : m_allocator(alloc), p_begin(nullptr), p_end(nullptr)
+    {
+        init_data(rhs.p_begin, rhs.p_end);
+    }
+
+    template <class T, class A>
+    inline kvector<T, A>& kvector<T, A>::operator=(const kvector& rhs)
+    {
+        // No copy and swap idiom here due to performance issues
+        if (this != &rhs)
+        {
+            m_allocator = std::allocator_traits<allocator_type>::select_on_container_copy_construction(rhs.get_allocator());
+            resize_impl(rhs.size());
+            if (xtrivially_default_constructible<value_type>::value)
+            {
+                std::uninitialized_copy(rhs.p_begin, rhs.p_end, p_begin);
+            }
+            else
+            {
+                std::copy(rhs.p_begin, rhs.p_end, p_begin);
+            }
+        }
+        return *this;
+    }
+
+    template <class T, class A>
+    inline kvector<T, A>::kvector(kvector&& rhs) noexcept
+        : m_allocator(std::move(rhs.m_allocator)), p_begin(rhs.p_begin), p_end(rhs.p_end)
+    {
+        rhs.p_begin = nullptr;
+        rhs.p_end = nullptr;
+        max_capacity = 0;
+    }
+
+    template <class T, class A>
+    inline kvector<T, A>::kvector(kvector&& rhs, const allocator_type& alloc) noexcept
+        : m_allocator(alloc), p_begin(rhs.p_begin), p_end(rhs.p_end)
+    {
+        //FIXME: max_capacity
+        rhs.p_begin = nullptr;
+        rhs.p_end = nullptr;
+    }
+
+    template <class T, class A>
+    inline kvector<T, A>& kvector<T, A>::operator=(kvector&& rhs) noexcept
+    {
+        //FIXME: max_capacity
+        using std::swap;
+        kvector tmp(std::move(rhs));
+        swap(p_begin, tmp.p_begin);
+        swap(p_end, tmp.p_end);
+        return *this;
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::get_allocator() const noexcept -> allocator_type
+    {
+        return allocator_type(m_allocator);
+    }
+
+    template <class T, class A>
+    inline bool kvector<T, A>::empty() const noexcept
+    {
+        return size() == size_type(0);
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::size() const noexcept -> size_type
+    {
+        return static_cast<size_type>(p_end - p_begin);
+    }
+
+    template <class T, class A>
+    inline void kvector<T, A>::resize(size_type size)
+    {
+        resize_impl(size);
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::max_size() const noexcept -> size_type
+    {
+        return m_allocator.max_size();
+    }
+
+    template <class T, class A>
+    inline void kvector<T, A>::reserve(size_type /*new_cap*/)
+    {
+    }
+    
+    template <class T, class A>
+    inline auto kvector<T, A>::capacity() const noexcept -> size_type
+    {
+        return size();
+    }
+
+    template <class T, class A>
+    inline void kvector<T, A>::shrink_to_fit()
+    {
+    }
+
+    template <class T, class A>
+    inline void kvector<T, A>::clear()
+    {
+        resize(size_type(0));
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::operator[](size_type i) -> reference
+    {
+        return p_begin[i];
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::operator[](size_type i) const -> const_reference
+    {
+        return p_begin[i];
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::at(size_type i) -> reference
+    {
+        if(i >= size())
+            throw std::out_of_range("Out of range in kvector access");
+        return this->operator[](i);
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::at(size_type i) const -> const_reference
+    {
+        if(i >= size())
+            throw std::out_of_range("Out of range in uvector access");
+        return this->operator[](i);
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::front() -> reference
+    {
+        return p_begin[0];
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::front() const -> const_reference
+    {
+        return p_begin[0];
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::back() -> reference
+    {
+        return *(p_end - 1);
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::back() const -> const_reference
+    {
+        return *(p_end - 1);
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::data() noexcept -> pointer
+    {
+        return p_begin;
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::data() const noexcept -> const_pointer
+    {
+        return p_begin;
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::begin() noexcept -> iterator
+    {
+        return p_begin;
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::end() noexcept -> iterator
+    {
+        return p_end;
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::begin() const noexcept -> const_iterator
+    {
+        return p_begin;
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::end() const noexcept -> const_iterator
+    {
+        return p_end;
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::cbegin() const noexcept -> const_iterator
+    {
+        return begin();
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::cend() const noexcept -> const_iterator
+    {
+        return end();
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::rbegin() noexcept -> reverse_iterator
+    {
+        return reverse_iterator(end());
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::rend() noexcept -> reverse_iterator
+    {
+        return reverse_iterator(begin());
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::rbegin() const noexcept -> const_reverse_iterator
+    {
+        return const_reverse_iterator(end());
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::rend() const noexcept -> const_reverse_iterator
+    {
+        return const_reverse_iterator(begin());
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::crbegin() const noexcept -> const_reverse_iterator
+    {
+        return rbegin();
+    }
+
+    template <class T, class A>
+    inline auto kvector<T, A>::crend() const noexcept -> const_reverse_iterator
+    {
+        return rend();
+    }
+
+    template <class T, class A>
+    inline void kvector<T, A>::swap(kvector<T, A>& rhs) noexcept
+    {
+        using std::swap;
+        swap(m_allocator, rhs.m_allocator);
+        swap(p_begin, rhs.p_begin);
+        swap(p_end, rhs.p_end);
+    }
+
+    template <class T, class A>
+    inline bool operator==(const kvector<T, A>& lhs, const kvector<T, A>& rhs)
+    {
+        return lhs.size() == rhs.size() && std::equal(lhs.begin(), lhs.end(), rhs.begin());
+    }
+
+    template <class T, class A>
+    inline bool operator!=(const kvector<T, A>& lhs, const kvector<T, A>& rhs)
+    {
+        return !(lhs == rhs);
+    }
+
+    template <class T, class A>
+    inline bool operator<(const kvector<T, A>& lhs, const kvector<T, A>& rhs)
+    {
+        return std::lexicographical_compare(lhs.begin(), lhs.end(),
+                                            rhs.begin(), rhs.end());
+    }
+
+    template <class T, class A>
+    inline bool operator<=(const kvector<T, A>& lhs, const kvector<T, A>& rhs)
+    {
+        return !(lhs > rhs);
+    }
+
+    template <class T, class A>
+    inline bool operator>(const kvector<T, A>& lhs, const kvector<T, A>& rhs)
+    {
+        return rhs < lhs;
+    }
+
+    template <class T, class A>
+    inline bool operator>=(const kvector<T, A>& lhs, const kvector<T, A>& rhs)
+    {
+        return !(lhs < rhs);
+    }
+
+    template <class T, class A>
+    inline void swap(kvector<T, A>& lhs, kvector<T, A>& rhs) noexcept
+    {
+        lhs.swap(rhs);
+    }
+
 }
 
 /******************************

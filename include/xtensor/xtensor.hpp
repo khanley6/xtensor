@@ -914,6 +914,10 @@ namespace xt
         return out;
     }
 
+    /*******************
+     * xts declaration *
+     *******************/
+
     template <class EC, std::size_t N, layout_type L, class Tag>
     struct xcontainer_inner_types<xts_container<EC, N, L, Tag>>
     {
@@ -942,7 +946,7 @@ namespace xt
      * @brief Dense multidimensional container with tensor semantic and fixed
      * dimension.
      *
-     * The xtensor_container class implements a dense multidimensional container
+     * The xts_container class implements a dense multidimensional container
      * with tensor semantics and fixed dimension
      *
      * @tparam EC The type of the container holding the elements.
@@ -1018,9 +1022,9 @@ namespace xt
         friend class xcontainer<xts_container<EC, N, L, Tag>>;
     };
 
-    /*****************************************
+    /*************************************
      * xts_container_adaptor declaration *
-     *****************************************/
+     *************************************/
 
     namespace extension
     {
@@ -1128,9 +1132,9 @@ namespace xt
         friend class xcontainer<xts_adaptor<EC, N, L, Tag>>;
     };
 
-    /****************************
+    /************************
      * xts_view declaration *
-     ****************************/
+     ************************/
 
     template <class EC, std::size_t N, layout_type L, class Tag>
     class xts_view;
@@ -1246,9 +1250,9 @@ namespace xt
         friend class xview_semantic<xts_view<EC, N, L, Tag>>;
     };
 
-    /************************************
+    /********************************
      * xts_container implementation *
-     ************************************/
+     ********************************/
 
     /**
      * @name Constructors
@@ -1422,9 +1426,9 @@ namespace xt
         return m_storage;
     }
 
-    /**********************************
+    /******************************
      * xts_adaptor implementation *
-     **********************************/
+     ******************************/
 
     /**
      * @name Constructors
