@@ -1202,8 +1202,6 @@ namespace xt
 
     /**
      * Resizes the container.
-     * @warning Contrary to STL containers like std::vector, resize
-     * does NOT preserve the container elements.
      * @param shape the new shape
      * @param force force reshaping, even if the shape stays the same (default: false)
      */
@@ -1211,6 +1209,23 @@ namespace xt
     template <class S>
     inline void xts_strided_container<D>::resize(S&& shape, bool force)
     {
+    if constexpr (std::is_integral_v<typename std::decay_t<S>>) {
+    // deal with integers
+    std::cout << "constexpr is_integral_v = TRUE" << std::endl;
+        if (m_shape[0] != shape) {
+            if (D::static_layout == layout_type::dynamic && m_layout == layout_type::dynamic)
+            {
+                m_layout = XTENSOR_DEFAULT_LAYOUT;  // fall back to default layout
+            }
+            std::array<std::size_t, 2> new_shape{static_cast<std::size_t>(shape), m_shape[1]};
+            m_shape = xtl::forward_sequence<shape_type, decltype(new_shape)>(std::move(new_shape));
+            //resize_container(m_strides, dim);
+            //resize_container(m_backstrides, dim);
+            size_type data_size = compute_strides<D::static_layout>(m_shape, m_layout, m_strides, m_backstrides);
+            detail::resize_data_container(this->storage(), data_size);
+        }
+    } else {
+    std::cout << "constexpr is_integral_v = FALSE" << std::endl;
         std::size_t dim = shape.size();
         if (m_shape.size() != dim || !std::equal(std::begin(shape), std::end(shape), std::begin(m_shape)) || force)
         {
@@ -1225,11 +1240,10 @@ namespace xt
             detail::resize_data_container(this->storage(), data_size);
         }
     }
+    }
 
     /**
      * Resizes the container.
-     * @warning Contrary to STL containers like std::vector, resize
-     * does NOT preserve the container elements.
      * @param shape the new shape
      * @param l the new layout_type
      */
@@ -1247,8 +1261,6 @@ namespace xt
 
     /**
      * Resizes the container.
-     * @warning Contrary to STL containers like std::vector, resize
-     * does NOT preserve the container elements.
      * @param shape the new shape
      * @param strides the new strides
      */
