@@ -362,6 +362,9 @@ namespace xt
         template <class S = shape_type>
         void resize(S&& shape, const strides_type& strides);
 
+        template <class S = size_type>
+        void push_back(S&& num_rows, bool force = false);
+
         template <class S = shape_type>
         void reshape(S&& shape, layout_type layout = base_type::static_layout);
 
@@ -1209,37 +1212,28 @@ namespace xt
     template <class S>
     inline void xts_strided_container<D>::resize(S&& shape, bool force)
     {
-    if constexpr (std::is_integral_v<typename std::decay_t<S>>) {
-    // deal with integers
-    std::cout << "constexpr is_integral_v = TRUE" << std::endl;
-        if (m_shape[0] != shape) {
-            if (D::static_layout == layout_type::dynamic && m_layout == layout_type::dynamic)
-            {
-                m_layout = XTENSOR_DEFAULT_LAYOUT;  // fall back to default layout
+        if constexpr (std::is_integral_v<typename std::decay_t<S>>) {
+        // deal with integers
+            if (m_shape[0] != shape) {
+                m_shape[0] = shape;
+                size_type data_size = compute_strides<D::static_layout>(m_shape, m_layout, m_strides, m_backstrides);
+                detail::resize_data_container(this->storage(), data_size);
             }
-            std::array<std::size_t, 2> new_shape{static_cast<std::size_t>(shape), m_shape[1]};
-            m_shape = xtl::forward_sequence<shape_type, decltype(new_shape)>(std::move(new_shape));
-            //resize_container(m_strides, dim);
-            //resize_container(m_backstrides, dim);
-            size_type data_size = compute_strides<D::static_layout>(m_shape, m_layout, m_strides, m_backstrides);
-            detail::resize_data_container(this->storage(), data_size);
-        }
-    } else {
-    std::cout << "constexpr is_integral_v = FALSE" << std::endl;
-        std::size_t dim = shape.size();
-        if (m_shape.size() != dim || !std::equal(std::begin(shape), std::end(shape), std::begin(m_shape)) || force)
-        {
-            if (D::static_layout == layout_type::dynamic && m_layout == layout_type::dynamic)
+        } else {
+            std::size_t dim = shape.size();
+            if (m_shape.size() != dim || !std::equal(std::begin(shape), std::end(shape), std::begin(m_shape)) || force)
             {
-                m_layout = XTENSOR_DEFAULT_LAYOUT;  // fall back to default layout
+                //if (D::static_layout == layout_type::dynamic && m_layout == layout_type::dynamic)
+                //{
+                    //m_layout = XTENSOR_DEFAULT_LAYOUT;  // fall back to default layout
+                //}
+                m_shape = xtl::forward_sequence<shape_type, S>(shape);
+                resize_container(m_strides, dim);
+                resize_container(m_backstrides, dim);
+                size_type data_size = compute_strides<D::static_layout>(m_shape, m_layout, m_strides, m_backstrides);
+                detail::resize_data_container(this->storage(), data_size);
             }
-            m_shape = xtl::forward_sequence<shape_type, S>(shape);
-            resize_container(m_strides, dim);
-            resize_container(m_backstrides, dim);
-            size_type data_size = compute_strides<D::static_layout>(m_shape, m_layout, m_strides, m_backstrides);
-            detail::resize_data_container(this->storage(), data_size);
         }
-    }
     }
 
     /**
@@ -1278,6 +1272,18 @@ namespace xt
         adapt_strides(m_shape, m_strides, m_backstrides);
         m_layout = layout_type::dynamic;
         detail::resize_data_container(this->storage(), compute_size(m_shape));
+    }
+
+    /**
+     * Adds rows to the container.
+     * @param num_rows Number of rows to add
+     * @param force force reshaping, even if the shape stays the same (default: false)
+     */
+    template <class D>
+    template <class S>
+    inline void xts_strided_container<D>::push_back(S&& num_rows, bool force)
+    {
+        resize(m_shape[0] + num_rows, force);
     }
 
     /**
