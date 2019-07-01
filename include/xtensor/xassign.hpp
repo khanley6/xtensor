@@ -70,6 +70,15 @@ namespace xt
         static void assign_data(xexpression<E1>& e1, const xexpression<E2>& e2, bool trivial);
     };
 
+    template <>
+    class xexpression_assigner_base<xts_expression_tag>
+    {
+    public:
+
+        template <class E1, class E2>
+        static void assign_data(xexpression<E1>& e1, const xexpression<E2>& e2, bool trivial);
+    };
+
     template <class Tag>
     class xexpression_assigner : public xexpression_assigner_base<Tag>
     {
@@ -304,6 +313,30 @@ namespace xt
 
     template <class E1, class E2>
     inline void xexpression_assigner_base<xtensor_expression_tag>::assign_data(xexpression<E1>& e1, const xexpression<E2>& e2, bool trivial)
+    {
+        E1& de1 = e1.derived_cast();
+        const E2& de2 = e2.derived_cast();
+
+        bool linear_assign = trivial && detail::is_linear_assign(de1, de2);
+        constexpr bool simd_assign = xassign_traits<E1, E2>::simd_assign();
+        constexpr bool strided_simd_assign = xassign_traits<E1, E2>::simd_strided_loop();
+        if (linear_assign)
+        {
+            linear_assigner<simd_assign>::run(de1, de2);
+        }
+        else if (strided_simd_assign)
+        {
+            strided_loop_assigner<strided_simd_assign>::run(de1, de2);
+        }
+        else
+        {
+            stepper_assigner<E1, E2, default_assignable_layout(E1::static_layout)> assigner(de1, de2);
+            assigner.run();
+        }
+    }
+
+    template <class E1, class E2>
+    inline void xexpression_assigner_base<xts_expression_tag>::assign_data(xexpression<E1>& e1, const xexpression<E2>& e2, bool trivial)
     {
         E1& de1 = e1.derived_cast();
         const E2& de2 = e2.derived_cast();

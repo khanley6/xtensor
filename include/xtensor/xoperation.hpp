@@ -146,6 +146,12 @@ namespace xt
             using type = xfunction<F, E...>;
         };
 
+        template <class F, class... E>
+        struct select_xfunction_expression<xts_expression_tag, F, E...>
+        {
+            using type = xfunction<F, E...>;
+        };
+
         template <class Tag, class F, class... E>
         using select_xfunction_expression_t = typename select_xfunction_expression<Tag, F, E...>::type;
 

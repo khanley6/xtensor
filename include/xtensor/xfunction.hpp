@@ -136,6 +136,12 @@ namespace xt
         };
 
         template <class F, class... CT>
+        struct xfunction_base_impl<xts_expression_tag, F, CT...>
+        {
+            using type = xts_empty_base;
+        };
+
+        template <class F, class... CT>
         struct xfunction_base
             : xfunction_base_impl<xexpression_tag_t<CT...>, F, CT...>
         {
