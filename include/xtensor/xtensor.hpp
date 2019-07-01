@@ -1012,6 +1012,8 @@ namespace xt
         template <class E>
         xts_container& operator=(const xexpression<E>& e);
 
+        auto row(std::size_t idx) { return view(*this, idx); }
+
     private:
 
         storage_type m_storage;
