@@ -2168,7 +2168,7 @@ namespace xt
     inline void kvector<T, A>::reserve(size_type /*new_cap*/)
     {
     }
-    
+
     template <class T, class A>
     inline auto kvector<T, A>::capacity() const noexcept -> size_type
     {

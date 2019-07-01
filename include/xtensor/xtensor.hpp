@@ -1635,7 +1635,7 @@ namespace xt
         std::fill(m_storage.begin(), m_storage.end(), e);
         return *this;
     }
-    
+
     template <class EC, std::size_t N, layout_type L, class Tag>
     inline auto xts_view<EC, N, L, Tag>::storage_impl() noexcept -> storage_type&
     {
